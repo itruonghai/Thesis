@@ -12,8 +12,7 @@ from monai.data import decollate_batch
 from monai.transforms import AsDiscrete, Activations, Compose, EnsureType
 import sys
 # insert at 1, 0 is the script path (or '' in REPL)
-sys.path.insert(1, '/home/nthai/segmentation-pipeline-3d')
-from models.Segformer.SegFormer import SegFormerNet
+from models.SegFormer import SegFormerNet
 
 # Pytorch Lightning
 import pytorch_lightning as pl
