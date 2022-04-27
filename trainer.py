@@ -12,14 +12,14 @@ from monai.data import decollate_batch
 from monai.transforms import AsDiscrete, Activations, Compose, EnsureType
 import sys
 # insert at 1, 0 is the script path (or '' in REPL)
-from models.SegFormer import SegFormerNet
+from models.SegFormer.SegFormer import SegFormerNet
 
 # Pytorch Lightning
 import pytorch_lightning as pl
 
 # Custom Libraries
-from models.SegTransVAE import SegTransVAE
-from data.brats import get_train_dataloader, get_val_dataloader, get_test_dataloader
+# from models.SegTransVAE import SegTransVAE
+# from data.brats import get_train_dataloader, get_val_dataloader, get_test_dataloader
 
 from loss.loss import DiceScore, Loss_VAE
 # from adabelief_pytorch import AdaBelief
@@ -30,10 +30,9 @@ import csv
 import os
 
 class BRATS(pl.LightningModule):
-    def __init__(self, use_VAE = True, lr = 1e-4, ):
+    def __init__(self, lr = 1e-4, ):
         super().__init__()
      
-        self.use_vae = use_VAE
         self.lr = lr
         # self.model = SegTransVAE((128, 128, 128), 8, 4, 3, 768, 8, 4, 3072, use_VAE = use_VAE)
         self.model = SegFormerNet(3, [128, 128, 128], in_chans = 4)
@@ -162,13 +161,13 @@ class BRATS(pl.LightningModule):
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 200)
         return [optimizer], [scheduler]
     
-    def train_dataloader(self):
-        return get_train_dataloader()
+    # def train_dataloader(self):
+    #     return get_train_dataloader()
     
-    def val_dataloader(self):
-        return get_val_dataloader()
+    # def val_dataloader(self):
+    #     return get_val_dataloader()
     
-    def test_dataloader(self):
-        return get_test_dataloader()
+    # def test_dataloader(self):
+    #     return get_test_dataloader()
     
    

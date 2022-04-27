@@ -109,7 +109,7 @@ class Attention(nn.Module):
         x = self.proj(x)
         x = self.proj_drop(x)
 
-        return x
+        return x, attn
 
 
 class Block(nn.Module):
@@ -145,10 +145,13 @@ class Block(nn.Module):
             if m.bias is not None:
                 m.bias.data.zero_()
 
-    def forward(self, x, D, H, W):
-        x = x + self.drop_path(self.attn(self.norm1(x), D, H, W))
+    def forward(self, x, D, H, W, return_attention = False):
+        y, attn = self.attn(self.norm1(x), D, H, W)
+        
+        x = x + self.drop_path(y)
         x = x + self.drop_path(self.mlp(self.norm2(x), D, H, W))
-
+        if return_attention:
+            return x, attn
         return x
 
 
@@ -268,10 +271,7 @@ class MixVisionTransformer(nn.Module):
             if m.bias is not None:
                 m.bias.data.zero_()
 
-    # def init_weights(self, pretrained=None):
-    #     if isinstance(pretrained, str):
-    #         logger = get_root_logger()
-    #         load_checkpoint(self, pretrained, map_location='cpu', strict=False, logger=logger)
+
 
     def reset_drop_path(self, drop_path_rate):
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(self.depths))]
@@ -342,7 +342,55 @@ class MixVisionTransformer(nn.Module):
         outs.append(x)
 
         return outs
+    def get_last_selfattention(self,x):
+        B = x.shape[0]
+        attn = []
 
+        # stage 1
+        x, D, H, W = self.patch_embed1(x)
+        for i, blk in enumerate(self.block1):
+            if i < len(self.block1) - 1:
+                x = blk(x, D, H, W)
+            else:
+                x, _attn = blk(x, D, H, W, return_attention=True)
+                attn.append(_attn)
+        x = self.norm1(x)
+        x = x.reshape(B, D, H, W, -1).permute(0, 4, 1, 2, 3).contiguous()
+
+        # stage 2
+        x, D, H, W = self.patch_embed2(x)
+        for i, blk in enumerate(self.block2):
+            if i < len(self.block2) - 1:
+                x = blk(x, D, H, W)
+            else:
+                x, _attn = blk(x, D, H, W, return_attention=True)
+                attn.append(_attn)
+        x = self.norm2(x)
+        x = x.reshape(B, D, H, W, -1).permute(0, 4, 1, 2, 3).contiguous()
+
+        # stage 3
+        x, D, H, W = self.patch_embed3(x)
+        for i, blk in enumerate(self.block3):
+            if i < len(self.block3) - 1:
+                x = blk(x, D, H, W)
+            else:
+                x, _attn = blk(x, D, H, W, return_attention=True)
+                attn.append(_attn)
+        x = self.norm3(x)
+        x = x.reshape(B, D, H, W, -1).permute(0, 4, 1, 2, 3).contiguous()
+
+        # stage 4
+        x, D, H, W = self.patch_embed4(x)
+        for i, blk in enumerate(self.block4):
+            if i < len(self.block4) - 1:
+                x = blk(x, D, H, W)
+            else:
+                x, _attn = blk(x, D, H, W, return_attention=True)
+                attn.append(_attn)
+        x = self.norm4(x)
+        x = x.reshape(B, D, H, W, -1).permute(0, 4, 1, 2, 3).contiguous()
+
+        return attn
     def forward(self, x):
         x = self.forward_features(x)
         # x = self.head(x)
