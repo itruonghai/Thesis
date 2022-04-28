@@ -19,7 +19,7 @@ import pytorch_lightning as pl
 
 # Custom Libraries
 # from models.SegTransVAE import SegTransVAE
-# from data.brats import get_train_dataloader, get_val_dataloader, get_test_dataloader
+from data.brats import get_train_dataloader, get_val_dataloader, get_test_dataloader
 
 from loss.loss import DiceScore, Loss_VAE
 # from adabelief_pytorch import AdaBelief
@@ -161,13 +161,13 @@ class BRATS(pl.LightningModule):
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 200)
         return [optimizer], [scheduler]
     
-    # def train_dataloader(self):
-    #     return get_train_dataloader()
+    def train_dataloader(self):
+        return get_train_dataloader()
     
-    # def val_dataloader(self):
-    #     return get_val_dataloader()
+    def val_dataloader(self):
+        return get_val_dataloader()
     
-    # def test_dataloader(self):
-    #     return get_test_dataloader()
+    def test_dataloader(self):
+        return get_test_dataloader()
     
    
