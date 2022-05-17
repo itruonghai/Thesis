@@ -14,6 +14,7 @@ class SegFormerNet(nn.Module):
         self.shape = shape
         # mit_b2 - mit_b4 available
         self.backbone = mit_b1(**kwargs)
+        
         self.decoder = SegFormerHead(in_channels=[64, 128, 320, 512],
                         in_index=[0, 1, 2, 3],
                         feature_strides=[4, 8, 16, 32],
@@ -24,13 +25,15 @@ class SegFormerNet(nn.Module):
                         align_corners=False,
                         decoder_params=dict(embed_dim=768))
 
-    def forward(self, x):
+    def forward(self, x, return_attn = False):
+        if return_attn:
+            x, attn = self.backbone(x, return_attn=True)
+            x = self.decoder(x)
+            x = F.interpolate(x, size = self.shape, mode='trilinear')
+            return x, attn
         x = self.backbone(x)
+
         x = self.decoder(x)
-        # x = resize(
-        #     input=x,
-        #     size=self.shape,
-        #     mode='trilinear',
-        #     align_corners=False)
         x = F.interpolate(x, size = self.shape, mode='trilinear')
         return x
+    

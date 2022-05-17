@@ -70,7 +70,6 @@ class Attention(nn.Module):
         if sr_ratio > 1:
             self.sr = nn.Conv3d(dim, dim, kernel_size=sr_ratio, stride=sr_ratio)
             self.norm = nn.LayerNorm(dim)
-
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
@@ -98,9 +97,8 @@ class Attention(nn.Module):
             x_ = self.norm(x_)
             kv = self.kv(x_).reshape(B, -1, 2, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
         else:
-            kv = self.kv(x).reshape(B, -1, 2, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+            kv = self.kv(x).reshape(B , -1, 2, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
         k, v = kv[0], kv[1]
-
         attn = (q @ k.transpose(-2, -1)) * self.scale
         attn = attn.softmax(dim=-1)
         attn = self.attn_drop(attn)
@@ -108,7 +106,6 @@ class Attention(nn.Module):
         x = (attn @ v).transpose(1, 2).reshape(B, N, C)
         x = self.proj(x)
         x = self.proj_drop(x)
-
         return x, attn
 
 
@@ -194,7 +191,6 @@ class OverlapPatchEmbed(nn.Module):
         _, _, D, H, W = x.shape
         x = x.flatten(2).transpose(1, 2)
         x = self.norm(x)
-
         return x, D, H, W
 
 
@@ -345,7 +341,7 @@ class MixVisionTransformer(nn.Module):
     def get_last_selfattention(self,x):
         B = x.shape[0]
         attn = []
-
+        outs = []
         # stage 1
         x, D, H, W = self.patch_embed1(x)
         for i, blk in enumerate(self.block1):
@@ -356,7 +352,7 @@ class MixVisionTransformer(nn.Module):
                 attn.append(_attn)
         x = self.norm1(x)
         x = x.reshape(B, D, H, W, -1).permute(0, 4, 1, 2, 3).contiguous()
-
+        outs.append(x)
         # stage 2
         x, D, H, W = self.patch_embed2(x)
         for i, blk in enumerate(self.block2):
@@ -367,7 +363,7 @@ class MixVisionTransformer(nn.Module):
                 attn.append(_attn)
         x = self.norm2(x)
         x = x.reshape(B, D, H, W, -1).permute(0, 4, 1, 2, 3).contiguous()
-
+        outs.append(x)
         # stage 3
         x, D, H, W = self.patch_embed3(x)
         for i, blk in enumerate(self.block3):
@@ -378,7 +374,7 @@ class MixVisionTransformer(nn.Module):
                 attn.append(_attn)
         x = self.norm3(x)
         x = x.reshape(B, D, H, W, -1).permute(0, 4, 1, 2, 3).contiguous()
-
+        outs.append(x)
         # stage 4
         x, D, H, W = self.patch_embed4(x)
         for i, blk in enumerate(self.block4):
@@ -389,12 +385,14 @@ class MixVisionTransformer(nn.Module):
                 attn.append(_attn)
         x = self.norm4(x)
         x = x.reshape(B, D, H, W, -1).permute(0, 4, 1, 2, 3).contiguous()
-
-        return attn
-    def forward(self, x):
+        outs.append(x)
+        return outs, attn
+    def forward(self, x, return_attn = False):
+        if return_attn:
+            x, attn = self.get_last_selfattention(x)
+            return x, attn 
         x = self.forward_features(x)
         # x = self.head(x)
-
         return x
 
 

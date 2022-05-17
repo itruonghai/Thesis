@@ -11,8 +11,8 @@ def test():
     model = SegFormerNet(1, [128, 128, 128], in_chans=4)
 
     pred = model(x)
-    print(x.shape)
-    print(pred.shape)
+    # print(x.shape)
+    # print(pred.shape)
 
 
 if __name__ == '__main__':

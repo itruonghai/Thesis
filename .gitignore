@@ -130,3 +130,6 @@ dmypy.json
 .__pycache__
 .DS_Store
 *.ckpt
+test.py
+.tmux*
+Data_BRATS/

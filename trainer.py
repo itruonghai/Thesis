@@ -30,10 +30,9 @@ import csv
 import os
 
 class BRATS(pl.LightningModule):
-    def __init__(self, lr = 1e-4, ):
+    def __init__(self, return_attn = False, ):
         super().__init__()
      
-        self.lr = lr
         # self.model = SegTransVAE((128, 128, 128), 8, 4, 3, 768, 8, 4, 3072, use_VAE = use_VAE)
         self.model = SegFormerNet(3, [128, 128, 128], in_chans = 4)
         # self.model = SegResNet(
@@ -52,11 +51,10 @@ class BRATS(pl.LightningModule):
                  AsDiscrete(threshold_values=True), 
                  ]
             )
-
+        self.return_attn = return_attn
         self.best_val_dice = 0
-
     def forward(self, x):
-        return self.model(x) 
+        return self.model(x, self.return_attn) 
     def training_step(self, batch, batch_index):
         inputs, labels = (batch['image'], batch['label'])
       
