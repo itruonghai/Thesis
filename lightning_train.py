@@ -6,7 +6,6 @@ from pytorch_lightning.loggers import TensorBoardLogger
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--exp', type=str, required=True)
 parser.add_argument('--model', type=str, required=True)
 args = parser.parse_args()
 
@@ -15,9 +14,9 @@ print("Training ...")
 model = BRATS(args)
 checkpoint_callback = ModelCheckpoint(
     monitor='val/MeanDiceScore',
-    dirpath='./ckpt/{}'.format(args.exp),
+    dirpath='./ckpt/{}'.format(args.model),
     filename='Epoch{epoch:3d}-MeanDiceScore{val/MeanDiceScore:.4f}',
-    save_top_k=3,
+    save_top_k=1,
     mode='max',
     save_last= True,
     auto_insert_metric_name=False
@@ -31,11 +30,11 @@ early_stop_callback = EarlyStopping(
 )
 tensorboardlogger = TensorBoardLogger(
     'logs', 
-    name = args.exp, 
+    name = args.model, 
     default_hp_metric = None 
 )
 trainer = pl.Trainer(#fast_dev_run = 10, 
-                    accelerator='ddp',
+#                     accelerator='ddp',
                     #overfit_batches=5,
                      gpus = -1, 
                         precision=16,

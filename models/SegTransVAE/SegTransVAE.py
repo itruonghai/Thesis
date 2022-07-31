@@ -7,7 +7,7 @@ from models.SegTransVAE.VAE import VAE
 
 class SegTransVAE(nn.Module):
     def __init__(self, img_dim, patch_dim, num_channels, num_classes, 
-                embedding_dim, num_heads, num_layers, hidden_dim, in_channels_vae, 
+                embedding_dim, num_heads, num_layers, hidden_dim, in_channels_vae = 128, 
                 dropout = 0.0, attention_dropout = 0.0,
                 conv_patch_representation = True, positional_encoding = 'learned',
                 use_VAE = False):

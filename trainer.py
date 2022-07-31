@@ -4,43 +4,57 @@ import torch.nn.functional as F
 import torch.nn as nn 
 
 # MONAI
-from monai.networks.nets import SegResNet, UNETR
+from monai.networks.nets import SegResNet, SwinUNETR, UNet
 from monai.metrics import DiceMetric#, compute_meandice
 from monai.losses import DiceLoss
 from monai.inferers import sliding_window_inference
 from monai.data import decollate_batch
 from monai.transforms import AsDiscrete, Activations, Compose, EnsureType
 import sys
-# insert at 1, 0 is the script path (or '' in REPL)
 from models.SegFormer.SegFormer import SegFormerNet
 
-# Pytorch Lightning
 import pytorch_lightning as pl
 
-# Custom Libraries
-from models.SegTransVAE import SegTransVAE
+from models.SegTransVAE.SegTransVAE import SegTransVAE
 from data.brats import get_train_dataloader, get_val_dataloader, get_test_dataloader
 
 from loss.loss import DiceScore, Loss_VAE
-# from adabelief_pytorch import AdaBelief
 import matplotlib.pyplot as plt
-
-# from models.TransBTS.TransBTS_downsample8x_skipconnection import TransBTS
 import csv
 import os
 model = {
-    'SegTransVAE': SegTransVAE((128, 128, 128), 8, 4, 3, 768, 8, 4, 3072, use_VAE = False), 
-    'SegFormer': SegFormerNet(3, [128, 128, 128], in_chans = 4),
-    'SwinUNETR': 1, 
-    'Unet3D': 2, 
+    'SegTransVAE': SegTransVAE((128, 128, 128), 
+                               8, 4, 3, 768, 
+                               8, 4, 3072, 
+                               use_VAE = False), 
+    'S3DFormer_Attention': SegFormerNet(3, [128, 128, 128], 
+                                        in_chans = 4, mixer_type = 'attention'),
+    'S3DFormer_Pooling': SegFormerNet(3, [128, 128, 128], 
+                                      in_chans = 4, mixer_type = 'pooling'),
+    'S3DFormer_Conv': SegFormerNet(3, [128, 128, 128], 
+                                      in_chans = 4, mixer_type = 'conv'),
+    'S3DFormer_MLP': SegFormerNet(3, [128, 128, 128], 
+                                      in_chans = 4, mixer_type = 'mlp'),
+    
+    
+    'SwinUNETR': SwinUNETR(   img_size=(128,128,128),
+                              in_channels=4,
+                              out_channels=3,
+                              feature_size=48,), 
+#     'Unet3D': UNet( spatial_dims=3,
+#                     in_channels=4,
+#                     out_channels=3,
+#                     channels=(16, 32, 64, 128, 256),
+#                     strides=(2, 2, 2, 2),
+#                     num_res_units=2,
+#                     norm=Norm.BATCH,), 
     'SegResNet': SegResNet(
-                blocks_down = [1,2,2,4],
-                blocks_up = [1,1,1],
-                init_filters = 16,
-                in_channels = 4,
-                out_channels = 3, 
-                dropout_prob = 0.2
-                )
+                    blocks_down = [1,2,2,4],
+                    blocks_up = [1,1,1],
+                    init_filters = 16,
+                    in_channels = 4,
+                    out_channels = 3, 
+                    dropout_prob = 0.2)
 
 }
 class BRATS(pl.LightningModule):
@@ -152,7 +166,7 @@ class BRATS(pl.LightningModule):
     
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(
-                    self.model.parameters(), self.lr, weight_decay=1e-5, amsgrad=True
+                    self.model.parameters(), 1e-4, weight_decay=1e-5, amsgrad=True
                     )
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 200)
         return [optimizer], [scheduler]
