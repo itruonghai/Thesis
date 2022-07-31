@@ -121,7 +121,7 @@ class Convolution(nn.Module):
         B, N, C = x.shape
         x = x.permute(0, 2, 1)
         x = x.reshape(B, C, D, H, W)
-        return self.conv(x).reshape(B, C, N).permute(B, N, C)
+        return self.conv(x).reshape(B, C, N).permute(0, 2, 1)
 
 class Pooling(nn.Module):
     """
@@ -148,7 +148,6 @@ class Block(nn.Module):
                  drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1):
         super().__init__()
         self.norm1 = norm_layer(dim)
-        print(mixer_type)
         if mixer_type == 'attention':
             self.mixer = Attention(
                 dim,
