@@ -114,8 +114,8 @@ class Convolution(nn.Module):
     """
     def __init__(self, dim, **kwargs):
         super().__init__()
-        self.conv = nn.Conv3D(
-                        dim, dim)
+        self.conv = nn.Conv3d(
+                        dim, dim, kernel_size = 3, padding = 'same')
 
     def forward(self, x, D, H, W):
         B, N, C = x.shape
@@ -135,7 +135,7 @@ class Pooling(nn.Module):
             padding=pool_size//2, 
             count_include_pad=False)
 
-    def forward(self, x):
+    def forward(self, x, D, H, W):
         return self.pool(x) - x
 
 # class MLP(nn.Module):
@@ -144,10 +144,11 @@ class Pooling(nn.Module):
 
 class Block(nn.Module):
 
-    def __init__(self, dim, num_heads, mixer_type = 'attention', mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
+    def __init__(self, dim, num_heads, mixer_type, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1):
         super().__init__()
         self.norm1 = norm_layer(dim)
+        print(mixer_type)
         if mixer_type == 'attention':
             self.mixer = Attention(
                 dim,
@@ -158,7 +159,7 @@ class Block(nn.Module):
         elif mixer_type == 'conv':
             self.mixer = Convolution(dim)
         elif mixer_type == 'mlp':
-            self.mixer = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop) 
+            self.mixer = Mlp(in_features=dim, hidden_features=dim, act_layer=act_layer, drop=drop) 
         else:
             assert False, f"mixer_type {mixer_type} is not supported."
         # NOTE: drop path for stochastic deptD, h, we shall see if this is better than dropout here
@@ -258,7 +259,7 @@ class MixVisionTransformer(nn.Module):
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]  # stochastic depth decay rule
         cur = 0
         self.block1 = nn.ModuleList([Block(
-            dim=embed_dims[0], num_heads=num_heads[0], mlp_ratio=mlp_ratios[0], qkv_bias=qkv_bias, qk_scale=qk_scale,
+            dim=embed_dims[0], num_heads=num_heads[0], mixer_type = mixer_type, mlp_ratio=mlp_ratios[0], qkv_bias=qkv_bias, qk_scale=qk_scale, 
             drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[cur + i], norm_layer=norm_layer,
             sr_ratio=sr_ratios[0])
             for i in range(depths[0])])
@@ -266,7 +267,7 @@ class MixVisionTransformer(nn.Module):
 
         cur += depths[0]
         self.block2 = nn.ModuleList([Block(
-            dim=embed_dims[1], num_heads=num_heads[1], mlp_ratio=mlp_ratios[1], qkv_bias=qkv_bias, qk_scale=qk_scale,
+            dim=embed_dims[1], num_heads=num_heads[1], mixer_type = mixer_type, mlp_ratio=mlp_ratios[1], qkv_bias=qkv_bias, qk_scale=qk_scale,
             drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[cur + i], norm_layer=norm_layer,
             sr_ratio=sr_ratios[1])
             for i in range(depths[1])])
@@ -274,7 +275,7 @@ class MixVisionTransformer(nn.Module):
 
         cur += depths[1]
         self.block3 = nn.ModuleList([Block(
-            dim=embed_dims[2], num_heads=num_heads[2], mlp_ratio=mlp_ratios[2], qkv_bias=qkv_bias, qk_scale=qk_scale,
+            dim=embed_dims[2], num_heads=num_heads[2], mixer_type = mixer_type, mlp_ratio=mlp_ratios[2], qkv_bias=qkv_bias, qk_scale=qk_scale,
             drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[cur + i], norm_layer=norm_layer,
             sr_ratio=sr_ratios[2])
             for i in range(depths[2])])
@@ -282,7 +283,7 @@ class MixVisionTransformer(nn.Module):
 
         cur += depths[2]
         self.block4 = nn.ModuleList([Block(
-            dim=embed_dims[3], num_heads=num_heads[3], mlp_ratio=mlp_ratios[3], qkv_bias=qkv_bias, qk_scale=qk_scale,
+            dim=embed_dims[3], num_heads=num_heads[3], mixer_type = mixer_type, mlp_ratio=mlp_ratios[3], qkv_bias=qkv_bias, qk_scale=qk_scale,
             drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[cur + i], norm_layer=norm_layer,
             sr_ratio=sr_ratios[3])
             for i in range(depths[3])])

@@ -6,7 +6,8 @@ logs/
 ckpt/
 # C extensions
 *.so
-
+logs/
+ckpt/
 # Distribution / packaging
 .Python
 build/

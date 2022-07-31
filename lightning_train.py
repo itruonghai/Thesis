@@ -7,6 +7,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str, required=True)
+parser.add_argument('--gpu')
 args = parser.parse_args()
 
 os.system('cls||clear')
@@ -36,7 +37,7 @@ tensorboardlogger = TensorBoardLogger(
 trainer = pl.Trainer(#fast_dev_run = 10, 
 #                     accelerator='ddp',
                     #overfit_batches=5,
-                     gpus = -1, 
+                     gpus = [int(args.gpu)] or [0], 
                         precision=16,
                      max_epochs = 200, 
                      progress_bar_refresh_rate=10,  
