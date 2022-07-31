@@ -1,9 +1,9 @@
 import torch 
 import torch.nn as nn
-from models.Transformer import Transformer, FixedPositionalEncoding, LearnedPositionalEncoding 
-from models.Encoder import Encoder
-from models.Decoder import Decoder
-from models.VAE import VAE
+from models.SegTransVAE.Transformer import Transformer, FixedPositionalEncoding, LearnedPositionalEncoding 
+from models.SegTransVAE.Encoder import Encoder
+from models.SegTransVAE.Decoder import Decoder
+from models.SegTransVAE.VAE import VAE
 
 class SegTransVAE(nn.Module):
     def __init__(self, img_dim, patch_dim, num_channels, num_classes, 

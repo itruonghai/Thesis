@@ -18,7 +18,7 @@ from models.SegFormer.SegFormer import SegFormerNet
 import pytorch_lightning as pl
 
 # Custom Libraries
-# from models.SegTransVAE import SegTransVAE
+from models.SegTransVAE import SegTransVAE
 from data.brats import get_train_dataloader, get_val_dataloader, get_test_dataloader
 
 from loss.loss import DiceScore, Loss_VAE
@@ -28,22 +28,25 @@ import matplotlib.pyplot as plt
 # from models.TransBTS.TransBTS_downsample8x_skipconnection import TransBTS
 import csv
 import os
+model = {
+    'SegTransVAE': SegTransVAE((128, 128, 128), 8, 4, 3, 768, 8, 4, 3072, use_VAE = False), 
+    'SegFormer': SegFormerNet(3, [128, 128, 128], in_chans = 4),
+    'SwinUNETR': 1, 
+    'Unet3D': 2, 
+    'SegResNet': SegResNet(
+                blocks_down = [1,2,2,4],
+                blocks_up = [1,1,1],
+                init_filters = 16,
+                in_channels = 4,
+                out_channels = 3, 
+                dropout_prob = 0.2
+                )
 
+}
 class BRATS(pl.LightningModule):
-    def __init__(self, return_attn = False, ):
+    def __init__(self, args):
         super().__init__()
-     
-        # self.model = SegTransVAE((128, 128, 128), 8, 4, 3, 768, 8, 4, 3072, use_VAE = use_VAE)
-        self.model = SegFormerNet(3, [128, 128, 128], in_chans = 4)
-        # self.model = SegResNet(
-        #         blocks_down = [1,2,2,4],
-        #         blocks_up = [1,1,1],
-        #         init_filters = 16,
-        #         in_channels = 4,
-        #         out_channels = 3, 
-        #         dropout_prob = 0.2
-        #         )
-        self.loss_vae = Loss_VAE()
+        self.model = model[args.model]
         self.dice_loss = DiceLoss(to_onehot_y=False, sigmoid=True, squared_pred=True)
         self.post_trans_images = Compose(
                 [EnsureType(),
@@ -51,10 +54,9 @@ class BRATS(pl.LightningModule):
                  AsDiscrete(threshold_values=True), 
                  ]
             )
-        self.return_attn = return_attn
         self.best_val_dice = 0
     def forward(self, x):
-        return self.model(x, self.return_attn) 
+        return self.model(x) 
     def training_step(self, batch, batch_index):
         inputs, labels = (batch['image'], batch['label'])
       
@@ -152,10 +154,6 @@ class BRATS(pl.LightningModule):
         optimizer = torch.optim.Adam(
                     self.model.parameters(), self.lr, weight_decay=1e-5, amsgrad=True
                     )
-#         optimizer = AdaBelief(self.model.parameters(), 
-#                             lr=self.lr, eps=1e-16, 
-#                             betas=(0.9,0.999), weight_decouple = True, 
-#                             rectify = False)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 200)
         return [optimizer], [scheduler]
     

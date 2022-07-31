@@ -7,11 +7,12 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--exp', type=str, required=True)
+parser.add_argument('--model', type=str, required=True)
 args = parser.parse_args()
 
 os.system('cls||clear')
 print("Training ...")
-model = BRATS()
+model = BRATS(args)
 checkpoint_callback = ModelCheckpoint(
     monitor='val/MeanDiceScore',
     dirpath='./ckpt/{}'.format(args.exp),

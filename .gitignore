@@ -133,3 +133,5 @@ dmypy.json
 test.py
 .tmux*
 Data_BRATS/
+et.nii.gz
+foo.png 

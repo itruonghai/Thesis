@@ -1,6 +1,6 @@
 import torch 
 import torch.nn as nn
-from models.ResNetBlock import ResNetBlock
+from models.SegTransVAE.ResNetBlock import ResNetBlock
 # from ResNetBlock import ResNetBlock
 
 from torch.nn import functional as F

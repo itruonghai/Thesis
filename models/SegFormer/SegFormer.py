@@ -12,7 +12,6 @@ class SegFormerNet(nn.Module):
     def __init__(self, num_classes, shape, **kwargs):
         super(SegFormerNet, self).__init__()
         self.shape = shape
-        # mit_b2 - mit_b4 available
         self.backbone = mit_b1(**kwargs)
         
         self.decoder = SegFormerHead(in_channels=[64, 128, 320, 512],
@@ -36,4 +35,3 @@ class SegFormerNet(nn.Module):
         x = self.decoder(x)
         x = F.interpolate(x, size = self.shape, mode='trilinear')
         return x
-    

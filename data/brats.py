@@ -79,7 +79,7 @@ def get_train_dataloader():
         ]
     )
     train_ds = Dataset(data=train_files, transform=train_transform)
-    train_loader = DataLoader(train_ds, batch_size=1, shuffle=True, num_workers=4)
+    train_loader = DataLoader(train_ds, batch_size=1, shuffle=True, num_workers=8)
 
     
     return train_loader
@@ -100,7 +100,7 @@ def get_val_dataloader():
         ]
     )
     val_ds = Dataset(data=val_files, transform=val_transform)
-    val_loader = DataLoader(val_ds, batch_size=1, shuffle=False, num_workers=4)
+    val_loader = DataLoader(val_ds, batch_size=1, shuffle=False, num_workers=8)
     
     return val_loader
 
@@ -120,7 +120,7 @@ def get_test_dataloader():
         ]
     )
     test_ds = Dataset(data=test_files, transform=test_transform)
-    test_loader = DataLoader(test_ds, batch_size=4, shuffle=False, num_workers=4)
+    test_loader = DataLoader(test_ds, batch_size=1, shuffle=False, num_workers=8)
     
     return test_loader
 

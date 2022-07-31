@@ -106,19 +106,61 @@ class Attention(nn.Module):
         x = (attn @ v).transpose(1, 2).reshape(B, N, C)
         x = self.proj(x)
         x = self.proj_drop(x)
-        return x, attn
+        return x
+class Convolution(nn.Module):
+    """
+    Implementation of Convolution for Conv-S3DFormer
+
+    """
+    def __init__(self, dim, **kwargs):
+        super().__init__()
+        self.conv = nn.Conv3D(
+                        dim, dim)
+
+    def forward(self, x, D, H, W):
+        B, N, C = x.shape
+        x = x.permute(0, 2, 1)
+        x = x.reshape(B, C, D, H, W)
+        return self.conv(x).reshape(B, C, N).permute(B, N, C)
+
+class Pooling(nn.Module):
+    """
+    Implementation of pooling for Pooling-S3DFormer
+    --pool_size: pooling size
+    """
+    def __init__(self, pool_size=3, **kwargs):
+        super().__init__()
+        self.pool = nn.AvgPool2d(
+            pool_size, stride=1, 
+            padding=pool_size//2, 
+            count_include_pad=False)
+
+    def forward(self, x):
+        return self.pool(x) - x
+
+# class MLP(nn.Module):
+#     def __init__(self):
 
 
 class Block(nn.Module):
 
-    def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
+    def __init__(self, dim, num_heads, mixer_type = 'attention', mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1):
         super().__init__()
         self.norm1 = norm_layer(dim)
-        self.attn = Attention(
-            dim,
-            num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale,
-            attn_drop=attn_drop, proj_drop=drop, sr_ratio=sr_ratio)
+        if mixer_type == 'attention':
+            self.mixer = Attention(
+                dim,
+                num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale,
+                attn_drop=attn_drop, proj_drop=drop, sr_ratio=sr_ratio)
+        elif mixer_type == 'pooling':
+            self.mixer = Pooling(pool_size=3)
+        elif mixer_type == 'conv':
+            self.mixer = Convolution(dim)
+        elif mixer_type == 'mlp':
+            self.mixer = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop) 
+        else:
+            assert False, f"mixer_type {mixer_type} is not supported."
         # NOTE: drop path for stochastic deptD, h, we shall see if this is better than dropout here
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.norm2 = norm_layer(dim)
@@ -142,13 +184,12 @@ class Block(nn.Module):
             if m.bias is not None:
                 m.bias.data.zero_()
 
-    def forward(self, x, D, H, W, return_attention = False):
-        y, attn = self.attn(self.norm1(x), D, H, W)
+    def forward(self, x, D, H, W):
+        y = self.mixer(self.norm1(x), D, H, W)
         
         x = x + self.drop_path(y)
         x = x + self.drop_path(self.mlp(self.norm2(x), D, H, W))
-        if return_attention:
-            return x, attn
+
         return x
 
 
