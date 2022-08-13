@@ -136,4 +136,5 @@ test.py
 .tmux*
 Data_BRATS/
 et.nii.gz
-foo.png 
+foo.png
+*logs/  

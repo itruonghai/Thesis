@@ -4,15 +4,16 @@ import torch.nn.functional as F
 import torch.nn as nn 
 
 # MONAI
+import monai
 from monai.networks.nets import SegResNet, SwinUNETR, UNet
-from monai.metrics import DiceMetric#, compute_meandice
+from monai.metrics import DiceMetric
+from loss.metrics import compute_hausdorff_distance
 from monai.losses import DiceLoss
 from monai.inferers import sliding_window_inference
 from monai.data import decollate_batch
 from monai.transforms import AsDiscrete, Activations, Compose, EnsureType
 import sys
 from models.SegFormer.SegFormer import SegFormerNet
-
 import pytorch_lightning as pl
 
 from models.SegTransVAE.SegTransVAE import SegTransVAE
@@ -28,26 +29,31 @@ model = {
                                8, 4, 3072, 
                                use_VAE = False), 
     'S3DFormer_Attention': SegFormerNet(3, [128, 128, 128], 
-                                        in_chans = 4, mixer_type = 'attention'),
+                                        in_chans = 4, mixer_type = ['attention', 'attention', 'attention', 'attention']),
     'S3DFormer_Pooling': SegFormerNet(3, [128, 128, 128], 
-                                      in_chans = 4, mixer_type = 'pooling'),
+                                      in_chans = 4, mixer_type = ['pooling', 'pooling', 'pooling', 'pooling']),
     'S3DFormer_Conv': SegFormerNet(3, [128, 128, 128], 
-                                      in_chans = 4, mixer_type = 'conv'),
+                                      in_chans = 4, mixer_type = ['conv', 'conv', 'conv', 'conv']),
     'S3DFormer_MLP': SegFormerNet(3, [128, 128, 128], 
-                                      in_chans = 4, mixer_type = 'mlp'),
-    
+                                      in_chans = 4, mixer_type = ['mlp', 'mlp', 'mlp', 'mlp']),
+    'S3DFormer_PoolingAttention': SegFormerNet(3, [128, 128, 128], 
+                                      in_chans = 4, mixer_type = ['pooling', 'pooling', 'attention', 'attention']),
+    'S3DFormer_ConvAttention': SegFormerNet(3, [128, 128, 128], 
+                                      in_chans = 4, mixer_type = ['conv', 'conv', 'attention', 'attention']),
+    'S3DFormer_MLPAttention': SegFormerNet(3, [128, 128, 128], 
+                                      in_chans = 4, mixer_type = ['mlp', 'mlp', 'attention', 'attention']),
     
     'SwinUNETR': SwinUNETR(   img_size=(128,128,128),
                               in_channels=4,
                               out_channels=3,
                               feature_size=48,), 
-#     'Unet3D': UNet( spatial_dims=3,
-#                     in_channels=4,
-#                     out_channels=3,
-#                     channels=(16, 32, 64, 128, 256),
-#                     strides=(2, 2, 2, 2),
-#                     num_res_units=2,
-#                     norm=Norm.BATCH,), 
+    'Unet3D': UNet( spatial_dims=3,
+                    in_channels=4,
+                    out_channels=3,
+                    channels=(16, 32, 64, 128, 256),
+                    strides=(2, 2, 2, 2),
+                    num_res_units=2,
+                    norm=monai.networks.layers.Norm.BATCH,), 
     'SegResNet': SegResNet(
                     blocks_down = [1,2,2,4],
                     blocks_up = [1,1,1],
@@ -58,9 +64,10 @@ model = {
 
 }
 class BRATS(pl.LightningModule):
-    def __init__(self, args):
+    def __init__(self, model_name):
         super().__init__()
-        self.model = model[args.model]
+        self.model_name = model_name
+        self.model = model[model_name]
         self.dice_loss = DiceLoss(to_onehot_y=False, sigmoid=True, squared_pred=True)
         self.post_trans_images = Compose(
                 [EnsureType(),
@@ -137,12 +144,49 @@ class BRATS(pl.LightningModule):
                     inputs, roi_size, sw_batch_size, self.forward, overlap = 0.5)
         loss = self.dice_loss(test_outputs, labels)
         test_outputs = self.post_trans_images(test_outputs)
-        metric_tc = DiceScore(y_pred=test_outputs[:, 0:1], y=labels[:, 0:1], include_background = True)
-        metric_wt = DiceScore(y_pred=test_outputs[:, 1:2], y=labels[:, 1:2], include_background = True)
-        metric_et = DiceScore(y_pred=test_outputs[:, 2:3], y=labels[:, 2:3], include_background = True)
+        metric_tc = DiceScore(y_pred=test_outputs[:, 0:1], 
+                              y=labels[:, 0:1], 
+                              include_background = True)
+        metric_wt = DiceScore(y_pred=test_outputs[:, 1:2], 
+                              y=labels[:, 1:2], 
+                              include_background = True)
+        metric_et = DiceScore(y_pred=test_outputs[:, 2:3], 
+                              y=labels[:, 2:3], 
+                              include_background = True)
+        hd_tc = compute_hausdorff_distance(
+                                y_pred=test_outputs[:, 0:1], 
+                                y=labels[:, 0:1], 
+                                include_background = True, 
+                                percentile = 95)
+        hd_wt = compute_hausdorff_distance(
+                                y_pred=test_outputs[:, 1:2], 
+                                y=labels[:, 1:2], 
+                                include_background = True, 
+                                percentile = 95)
+        hd_et = compute_hausdorff_distance(
+                                y_pred=test_outputs[:, 2:3], 
+                                y=labels[:, 2:3], 
+                                include_background = True, 
+                                percentile = 95)
+        
         mean_test_dice =  (metric_tc + metric_wt + metric_et)/3
-        return {'test_loss': loss, 'test_mean_dice': mean_test_dice, 'test_dice_tc': metric_tc,
-                'test_dice_wt': metric_wt, 'test_dice_et': metric_et}
+        os.makedirs('test_logs',  exist_ok=True)
+        if batch_index == 0:
+            with open('{}/{}.csv'.format('test_logs', self.model_name), 'w') as f:
+                writer = csv.writer(f)
+                writer.writerow(['Case', 'Mean Dice Score', 'Dice TC', 'Dice WT', 
+                                     'Dice ET', 'HD TC', 'HD WT', 'HD ET'])
+        with open('{}/{}.csv'.format('test_logs', self.model_name), 'a') as f:
+            writer = csv.writer(f)
+            writer.writerow([batch_index, mean_test_dice.item(), 
+                             metric_tc.item(), metric_wt.item(), 
+                             metric_et.item(), float(hd_tc.numpy()), 
+                             float(hd_wt.numpy()), float(hd_et.numpy())])
+            
+        return {'test_loss': loss, 'test_mean_dice': mean_test_dice, 
+                'test_dice_tc': metric_tc, 'test_dice_wt': metric_wt, 
+                'test_dice_et': metric_et, 'hd_tc': hd_et, 
+               'hd_wt': hd_wt, 'hd_et': hd_et}
     
     def test_epoch_end(self, outputs):
         loss = torch.stack([x['test_loss'] for x in outputs]).mean()
@@ -150,17 +194,17 @@ class BRATS(pl.LightningModule):
         metric_tc = torch.stack([x['test_dice_tc'] for x in outputs]).mean()
         metric_wt = torch.stack([x['test_dice_wt'] for x in outputs]).mean()
         metric_et = torch.stack([x['test_dice_et'] for x in outputs]).mean()
+        metric_hd_tc = torch.stack([x['hd_tc'] for x in outputs]).mean()
+        metric_hd_wt = torch.stack([x['hd_wt'] for x in outputs]).mean()
+        metric_hd_et = torch.stack([x['hd_et'] for x in outputs]).mean()
         self.log('test/Loss', loss)
         self.log('test/MeanDiceScore', mean_test_dice)
         self.log('test/DiceTC', metric_tc)
         self.log('test/DiceWT', metric_wt)
         self.log('test/DiceET', metric_et)
-
-        with open('{}/test_log.csv'.format(self.logger.log_dir), 'w') as f:
-            writer = csv.writer(f)
-            writer.writerow(["Mean Test Dice", "Dice TC", "Dice WT", "Dice ET"])
-            writer.writerow([mean_test_dice, metric_tc, metric_wt, metric_et])
-
+        self.log('test/HD_TC', metric_hd_tc)
+        self.log('test/HD_WT', metric_hd_wt)
+        self.log('test/HD_ET', metric_hd_et)
         return {'test_MeanDiceScore': mean_test_dice}
         
     

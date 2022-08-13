@@ -3,15 +3,26 @@ import pytorch_lightning as pl
 from trainer import BRATS
 import os 
 import torch
+import argparse
+
 os.system('cls||clear')
 print("Testing ...")
 
-CKPT = 'best.ckpt'
-model = BRATS().load_from_checkpoint(CKPT).eval()
+parser = argparse.ArgumentParser()
+parser.add_argument('--model', type=str, required=True)
+parser.add_argument('--ckpt', type=str, default = None)
+parser.add_argument('--gpu')
+
+args = parser.parse_args()
+model = BRATS(args.model)
+if args.ckpt != 'None':
+    checkpoint = torch.load(args.ckpt, map_location='cpu')
+    model.load_state_dict(checkpoint['state_dict'])
+model.eval()
 val_dataloader = get_val_dataloader()
 test_dataloader = get_test_dataloader()
-trainer = pl.Trainer(gpus = [0], precision=32, progress_bar_refresh_rate=10)
+trainer = pl.Trainer(gpus = [int(args.gpu)], precision=16, progress_bar_refresh_rate=10)
 
 trainer.test(model, dataloaders = val_dataloader)
-trainer.test(model, dataloaders = test_dataloader)
+# trainer.test(model, dataloaders = test_dataloader)
 
